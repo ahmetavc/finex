@@ -46,6 +46,14 @@ func Execute() {
 	cobra.CheckErr(rootCmd.Execute())
 }
 
+func defaultRootPath() string {
+	dir, err := os.Getwd()
+	if err != nil {
+		return ""
+	}
+	return dir
+}
+
 func init() {
 	cobra.OnInitialize(initConfig)
 
@@ -53,7 +61,7 @@ func init() {
 	// Cobra supports persistent flags, which, if defined here,
 	// will be global for your application.
 
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.finex.yaml)")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", defaultRootPath(), "root path (default is $CWD)")
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
