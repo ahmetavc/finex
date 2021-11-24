@@ -1,7 +1,13 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"log"
+	"math"
+	"strconv"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/xuri/excelize/v2"
@@ -9,6 +15,20 @@ import (
 
 var excelFileName string
 
+type transaction struct {
+	name  string
+	date  string
+	price float64
+}
+
+type categories struct {
+	Categories []categoryKeyValue `json:"categories"`
+}
+
+type categoryKeyValue struct {
+	Category string `json:"category"`
+	Keywords []string `json:"keywords"`
+}
 
 // categorizeCmd represents the categorize command
 var categorizeCmd = &cobra.Command{
@@ -21,6 +41,7 @@ Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
+		loadCategories()
 		readExcel()
 	},
 }
@@ -43,35 +64,46 @@ func init() {
 	// categorizeCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
 
-func readExcel() {
+func readExcel() ([]transaction, error) {
 	f, err := excelize.OpenFile(excelFileName)
 	if err != nil {
 		fmt.Println(err)
-		return
+		return nil, err
 	}
-	// Get value from cell by given worksheet name and axis.
-	cell, err := f.GetCellValue("sheet", "B2")
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	fmt.Println(cell)
-	// Get all the rows in the Sheet1.
+	var transactions []transaction
+
 	rows, err := f.GetRows("sheet")
 	if err != nil {
 		fmt.Println(err)
-		return
+		return nil, err
 	}
-	for _, row := range rows {
-		for _, colCell := range row {
-			fmt.Print(colCell, "\t")
-		}
-		fmt.Println()
+
+	for _, row := range rows[2:] {
+		priceWithDots := strings.Replace(row[2], ",", ".", -1)
+		price, _ := strconv.ParseFloat(priceWithDots, 32)
+
+		transactions = append(transactions, transaction{
+			name:  row[0],
+			date:  row[1],
+			price: math.Floor(float64(price)*100) / 100,
+		})
 	}
+
+	return transactions, nil
 }
 
+func loadCategories() (categories, error){
+	var Categories categories
+	raw, err := ioutil.ReadFile("config.json")
+	if err != nil {
+		log.Println("Error occured while reading config")
+		return categories{}, err
+	}
+	json.Unmarshal(raw, &Categories)
 
+	return Categories, nil
+}
 
+func categorize(transactions []transaction, conf categories) {
 
-
-
+}

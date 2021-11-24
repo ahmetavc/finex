@@ -1,4 +1,4 @@
-module finex
+module github.com/ahmetavc/finex
 
 go 1.17
 
