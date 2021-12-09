@@ -12,20 +12,21 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/xuri/excelize/v2"
 )
+const config = "config.json"
 
 var excelFileName string
 
-type transaction struct {
+type Transaction struct {
 	name  string
 	date  string
 	price float64
 }
 
-type categories struct {
-	Categories []categoryKeyValue `json:"categories"`
+type Categories struct {
+	Categories []CategoryKeyValue `json:"categories"`
 }
 
-type categoryKeyValue struct {
+type CategoryKeyValue struct {
 	Category string `json:"category"`
 	Keywords []string `json:"keywords"`
 }
@@ -41,8 +42,7 @@ Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		loadCategories()
-		readExcel()
+		do()
 	},
 }
 
@@ -64,13 +64,38 @@ func init() {
 	// categorizeCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
 
-func readExcel() ([]transaction, error) {
+func do() map[string]float64 {
+	transactions, _ := readExcel()
+	keywords, _ := loadCategories()
+
+	categoryDistribution := make(map[string]float64)
+
+	for _, transaction := range transactions{
+		found := false
+		for keyword, category := range keywords{
+			if strings.Contains(transaction.name, keyword){
+				categoryDistribution[category] = categoryDistribution[category] + transaction.price
+				found = true
+				break
+			}
+		}
+		if found == false{
+			//TODO: in this case as the user what to do
+			categoryDistribution["other"] = categoryDistribution["other"] + transaction.price
+		}
+	}
+
+	fmt.Println(categoryDistribution)
+	return categoryDistribution
+}
+
+func readExcel() ([]Transaction, error) {
 	f, err := excelize.OpenFile(excelFileName)
 	if err != nil {
 		fmt.Println(err)
 		return nil, err
 	}
-	var transactions []transaction
+	var transactions []Transaction
 
 	rows, err := f.GetRows("sheet")
 	if err != nil {
@@ -81,9 +106,10 @@ func readExcel() ([]transaction, error) {
 	for _, row := range rows[2:] {
 		priceWithDots := strings.Replace(row[2], ",", ".", -1)
 		price, _ := strconv.ParseFloat(priceWithDots, 32)
+		name := strings.ToLower(row[0])
 
-		transactions = append(transactions, transaction{
-			name:  row[0],
+		transactions = append(transactions, Transaction{
+			name:  name,
 			date:  row[1],
 			price: math.Floor(float64(price)*100) / 100,
 		})
@@ -92,18 +118,31 @@ func readExcel() ([]transaction, error) {
 	return transactions, nil
 }
 
-func loadCategories() (categories, error){
-	var Categories categories
-	raw, err := ioutil.ReadFile("config.json")
+func loadCategories() (map[string]string, error){
+	var cats Categories
+	raw, err := ioutil.ReadFile(config)
 	if err != nil {
-		log.Println("Error occured while reading config")
-		return categories{}, err
+		log.Println("Error occurred while reading config")
+		return nil, err
 	}
-	json.Unmarshal(raw, &Categories)
 
-	return Categories, nil
+	err = json.Unmarshal(raw, &cats)
+	if err != nil {
+		return nil, err
+	}
+
+	return createKeywordMap(cats), nil
 }
 
-func categorize(transactions []transaction, conf categories) {
+func createKeywordMap(cats Categories) map[string]string {
+	keywordMap := make(map[string]string)
 
+	for _, value := range cats.Categories {
+		category := value.Category
+		for _, keyword := range value.Keywords {
+			keywordMap[keyword] = category
+		}
+	}
+
+	return keywordMap
 }
